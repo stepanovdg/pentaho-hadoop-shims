@@ -226,10 +226,10 @@ public class ConfigurationProxyV2 implements Configuration {
   }
 
   /**
-   * Sets the requisite number of reduce tasks for the MapReduce job submitted with this configuration.  <p>If
-   * {@code n} is {@code zero} there will not be a reduce (or sort/shuffle) phase and the output of the map tasks will
-   * be written directly to the distributed file system under the path specified via {@link
-   * #setOutputPath(org.pentaho.hadoop.shim.api.fs.Path)</p>
+   * Sets the requisite number of reduce tasks for the MapReduce job submitted with this configuration.  <p>If {@code n}
+   * is {@code zero} there will not be a reduce (or sort/shuffle) phase and the output of the map tasks will be written
+   * directly to the distributed file system under the path specified via {@link #setOutputPath(org.pentaho.hadoop
+   * .shim.api.fs.Path)</p>
    *
    * @param n the number of reduce tasks required for this job
    * @param n
@@ -258,5 +258,23 @@ public class ConfigurationProxyV2 implements Configuration {
   @Override
   public String getDefaultFileSystemURL() {
     return get( "fs.default.name", "" );
+  }
+
+  /**
+   * Hack
+   * Return this configuration as was asked with provided delegate class (If it is possible).
+   *
+   * @param delegate class of desired return object
+   * @return this configuration delegate object if possible
+   */
+  @Override
+  public <T> T getAsDelegateConf( Class<T> delegate ) {
+    if ( delegate.isAssignableFrom( this.getClass() ) ) {
+      return (T) this;
+    } else if ( delegate.isAssignableFrom( JobConf.class ) ) {
+      return (T) getJobConf();
+    } else {
+      return null;
+    }
   }
 }
