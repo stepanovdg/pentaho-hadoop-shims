@@ -298,8 +298,9 @@ public class GenericTransReduce<K extends WritableComparable<?>, V extends Itera
 
   @Override
   public void close() throws IOException {
-    rowProducer.finished();
-
+    if ( rowProducer != null ) {
+      rowProducer.finished();
+    }
     // Stop the executor if any is defined...
     if ( isSingleThreaded() && executor != null ) {
       try {
