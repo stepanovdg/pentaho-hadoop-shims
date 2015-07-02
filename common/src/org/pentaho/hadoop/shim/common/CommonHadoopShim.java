@@ -67,6 +67,33 @@ public class CommonHadoopShim implements HadoopShim {
         }
       };
 
+  @SuppressWarnings( "serial" )
+  protected static Map<String, Class<? extends Driver>> JDBC_POSSIBLE_DRIVER_MAP =
+    new HashMap<String, Class<? extends Driver>>();
+
+  static {
+    tryToLoadDriver( "hive2Simba", "com.simba.hive.jdbc41.HS2Driver", JDBC_POSSIBLE_DRIVER_MAP );
+    tryToLoadDriver( "ImpalaSimba", "com.simba.impala.jdbc41.Driver", JDBC_POSSIBLE_DRIVER_MAP );
+  }
+
+  @SuppressWarnings( "unchecked" )
+  protected static void tryToLoadDriver( String type, String driverClassName,
+                                         Map<String, Class<? extends Driver>> mapToLoad ) {
+    Class possibleDriver = null;
+    try {
+      possibleDriver = Class.forName( driverClassName );
+      if ( Driver.class.isAssignableFrom( possibleDriver ) ) {
+        mapToLoad.put( type, possibleDriver );
+      } else {
+        throw new ClassCastException( "Specified extra driver class does not extends java.sql.Driver" );
+      }
+    } catch ( ClassNotFoundException e ) {
+      // Ignore
+    } catch ( ClassCastException e2 ) {
+      e2.printStackTrace();
+    }
+  }
+
   @Override
   public ShimVersion getVersion() {
     return new ShimVersion( 1, 0 );
@@ -98,9 +125,12 @@ public class CommonHadoopShim implements HadoopShim {
       Class<? extends Driver> clazz = JDBC_DRIVER_MAP.get( driverType );
       if ( clazz != null ) {
         Driver newInstance = clazz.newInstance();
-        Driver driverProxy = DriverProxyInvocationChain.getProxy( Driver.class, newInstance );
-        return driverProxy;
+        return DriverProxyInvocationChain.getProxy( Driver.class, newInstance );
       } else {
+        clazz = JDBC_POSSIBLE_DRIVER_MAP.get( driverType );
+        if ( clazz != null ) {
+          return clazz.newInstance();
+        }
         return null;
       }
 
