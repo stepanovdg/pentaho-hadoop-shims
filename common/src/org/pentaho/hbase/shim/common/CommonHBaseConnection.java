@@ -43,8 +43,10 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.filter.BinaryPrefixComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.FilterList;
+import org.apache.hadoop.hbase.filter.PrefixFilter;
 import org.apache.hadoop.hbase.filter.RegexStringComparator;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.filter.SubstringComparator;
@@ -396,8 +398,6 @@ public class CommonHBaseConnection extends HBaseConnection {
       FilterList fl = (FilterList) m_sourceScan.getFilter();
 
       CompareFilter.CompareOp comp = null;
-      byte[] family = m_bytesUtil.toBytes( columnMeta.getColumnFamily() );
-      byte[] qualifier = m_bytesUtil.toBytes( columnMeta.getColumnName() );
       ColumnFilter.ComparisonType op = cf.getComparisonOperator();
 
       switch ( op ) {
@@ -426,7 +426,7 @@ public class CommonHBaseConnection extends HBaseConnection {
 
       String comparisonString = cf.getConstant().trim();
       comparisonString = vars.environmentSubstitute( comparisonString );
-
+      byte[] comparison = m_bytesUtil.toBytes( comparisonString );
       Class<?> comparatorClass = getByteArrayComparableClass();
       Object comparator = null;
 
@@ -524,18 +524,38 @@ public class CommonHBaseConnection extends HBaseConnection {
         comp = CompareFilter.CompareOp.EQUAL;
         if ( cf.getComparisonOperator() == ColumnFilter.ComparisonType.SUBSTRING ) {
           comparator = new SubstringComparator( comparisonString );
-        } else {
+        } else if ( cf.getComparisonOperator() == ColumnFilter.ComparisonType.REGEX ) {
           comparator = new RegexStringComparator( comparisonString );
+        } else /*if ( cf.getComparisonOperator() == ColumnFilter.ComparisonType.PREFIX )*/ {
+          //First of all check if it is Key in this case prefix filter is more appreciable
+          if ( columnMeta.isKey() ) {
+            PrefixFilter scf = new PrefixFilter( comparison );
+            fl.addFilter( scf );
+            return;
+          }
+          comparator = new BinaryPrefixComparator( comparison );
+          // comparator == null means prefix was chosen
         }
       }
 
       if ( comparator != null ) {
+        byte[] family = m_bytesUtil.toBytes( columnMeta.getColumnFamily() );
+        byte[] qualifier = m_bytesUtil.toBytes( columnMeta.getColumnName() );
+
         Constructor<SingleColumnValueFilter> scvfCtor =
             SingleColumnValueFilter.class.getConstructor( byte[].class, byte[].class, CompareFilter.CompareOp.class,
                 comparatorClass );
         SingleColumnValueFilter scf = scvfCtor.newInstance( family, qualifier, comp, comparator );
         scf.setFilterIfMissing( true );
         fl.addFilter( scf );
+      } else {
+        //First of all check if it is Key
+        if ( columnMeta.isKey() ) {
+          PrefixFilter scf = new PrefixFilter( comparison );
+          fl.addFilter( scf );
+        } else {
+
+        }
       }
     } finally {
       Thread.currentThread().setContextClassLoader( cl );
