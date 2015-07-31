@@ -45,11 +45,16 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.filter.BinaryPrefixComparator;
 import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.FamilyFilter;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.PrefixFilter;
+import org.apache.hadoop.hbase.filter.QualifierFilter;
 import org.apache.hadoop.hbase.filter.RegexStringComparator;
+import org.apache.hadoop.hbase.filter.RowFilter;
 import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.filter.SubstringComparator;
+import org.apache.hadoop.hbase.filter.TimestampsFilter;
+import org.apache.hadoop.hbase.filter.ValueFilter;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.i18n.BaseMessages;
@@ -60,6 +65,7 @@ import org.pentaho.hbase.factory.HBasePut;
 import org.pentaho.hbase.factory.HBaseTable;
 import org.pentaho.hbase.shim.api.ColumnFilter;
 import org.pentaho.hbase.shim.api.HBaseValueMeta;
+import org.pentaho.hbase.shim.api.Mapping;
 import org.pentaho.hbase.shim.spi.HBaseBytesUtilShim;
 import org.pentaho.hbase.shim.spi.HBaseConnection;
 
@@ -539,6 +545,54 @@ public class CommonHBaseConnection extends HBaseConnection {
       }
 
       if ( comparator != null ) {
+        Mapping.TuppleMapping tuppleMapping;
+        try {
+          tuppleMapping = Mapping.TuppleMapping.valueOf( cf.getFieldAlias() );
+        } catch ( IllegalArgumentException ignored ) {
+          tuppleMapping = null;
+        }
+        if ( tuppleMapping != null ) {
+          switch( tuppleMapping ) {
+            case KEY: {
+              Constructor<RowFilter> rowFilterConstructor =
+                RowFilter.class.getConstructor( CompareFilter.CompareOp.class, comparatorClass );
+              RowFilter scf = rowFilterConstructor.newInstance( comp, comparator );
+              fl.addFilter( scf );
+              return;
+            }
+            case FAMILY: {
+              Constructor<FamilyFilter> familyFilterConstructor =
+                FamilyFilter.class.getConstructor( CompareFilter.CompareOp.class, comparatorClass );
+              FamilyFilter scf = familyFilterConstructor.newInstance( comp, comparator );
+              fl.addFilter( scf );
+              return;
+            }
+            case COLUMN: {
+              //TODO Check if ColumnPrefixFilter works faster and suit more
+              //TODO Check how will several Prefixes work (MultipleColumnPrefixFilter)
+
+              Constructor<QualifierFilter> columnFilterConstructor =
+                QualifierFilter.class.getConstructor( CompareFilter.CompareOp.class, comparatorClass );
+              QualifierFilter scf = columnFilterConstructor.newInstance( comp, comparator );
+              fl.addFilter( scf );
+              return;
+            }
+            case VALUE: {
+              Constructor<ValueFilter> valueFilterConstructor =
+                ValueFilter.class.getConstructor( CompareFilter.CompareOp.class, comparatorClass );
+              ValueFilter scf = valueFilterConstructor.newInstance( comp, comparator );
+              fl.addFilter( scf );
+              return;
+            }
+            case TIMESTAMP: {
+              Constructor<TimestampsFilter> columnFilterConstructor =
+                TimestampsFilter.class.getConstructor( CompareFilter.CompareOp.class, comparatorClass );
+              TimestampsFilter scf = columnFilterConstructor.newInstance( comp, comparator );
+              fl.addFilter( scf );
+              return;
+            }
+          }
+        }
         byte[] family = m_bytesUtil.toBytes( columnMeta.getColumnFamily() );
         byte[] qualifier = m_bytesUtil.toBytes( columnMeta.getColumnName() );
 
