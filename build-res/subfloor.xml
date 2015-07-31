@@ -982,10 +982,19 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       executed on the user's system.
       ====================================================================-->
   <target name="publish-local"
-          depends="dist, dist-source, publish-local-nojar"
+          depends="dist, dist-source, publish-local-nojar, publish-local-maven"
           description="Builds and publishes the jar file to the local repository"/>
 
-
+  <target name="publish-local-maven" depends="init"
+          description="publish jar/source to maven repo mounted at ~/.m2/repository">
+    <ivy:makepom ivyfile="${ivyfile}" pomfile="${dist.dir}/pom.xml">
+          <mapping conf="default" scope="compile"/>
+          <mapping conf="runtime" scope="runtime"/>
+        </ivy:makepom>
+    <ivy:publish resolver="local-m2-publish" forcedeliver="true" overwrite="true" publishivy="false">
+      <artifacts pattern="${dist.dir}/[artifact]-[revision](-[classifier]).[ext]"/>
+    </ivy:publish>
+  </target>
   <!--=======================================================================
         publish
 

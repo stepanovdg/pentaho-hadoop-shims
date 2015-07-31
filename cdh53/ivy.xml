@@ -12,6 +12,7 @@
   </configurations>
 
   <publications>
+    <artifact type="pom" ext="pom" conf="default"/>
     <artifact name="${ivy.artifact.id}" type="jar" conf="default" />
     <artifact name="${package.id}" type="zip" conf="zip" />
   </publications>
